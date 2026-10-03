@@ -15,6 +15,17 @@ func randomIdentifier(prefix string) (string, error) {
 	return fmt.Sprintf("%s-%s", prefix, suffix), nil
 }
 
+// randomHyphenIdentifier returns an identifier using only lowercase hex digits
+// (plus the prefix/hyphens), which matches the domain id pattern for resources
+// whose id alphabet excludes underscores, such as region lockdowns.
+func randomHyphenIdentifier(prefix string) (string, error) {
+	value := make([]byte, 10)
+	if _, err := io.ReadFull(rand.Reader, value); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s-%x", prefix, value), nil
+}
+
 func randomToken() (string, error) {
 	return randomBytes(24)
 }

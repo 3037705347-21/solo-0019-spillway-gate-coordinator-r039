@@ -34,16 +34,30 @@
 
 闸门操作员通过 `POST /commands/{id}/execute` 提交执行令牌。服务校验命令、令牌、闸门占用关系和目标开度，在临界区内完成 approved、executing、completed 或 aborted 的转换，并同步更新闸门状态。令牌在命令结束后失效，不能复用。
 
+### establish-region-lockdown
+
+值班负责人通过 `POST /lockdowns` 提交区域封锁，必须显式给出闸门范围 `gate_ids` 和业务依据（`reason`、`authority`）。服务在单一临界区内原子完成：标记范围内闸门为封锁态，并把范围内所有 approved 但尚未开始执行的命令转为 withdrawn、同步释放闸门占用并作废执行令牌。pending 命令保留、executing 命令继续到终态、completed/aborted/rejected 历史保持不变。
+
+封锁期间范围内闸门不能创建新命令，clear 复核（新占用）返回冲突；blocked 复核不占用闸门，仍可拒绝命令。范围外闸门不受影响。重复封锁（同 ID 或范围重叠）返回稳定冲突。
+
+### release-region-lockdown
+
+值班负责人通过 `POST /lockdowns/{id}/release` 解除封锁。解除只清除封锁标记，不改变闸门运行状态；解除后范围内按当时真实状态重新可调度（pending 可复核、可新建命令、可对同一范围再次封锁）。重复解除返回稳定冲突。`GET /lockdowns/{id}` 返回封锁记录和被撤回命令清单。
+
 ## 状态与规则
 
-- `gate` 状态：idle、reserved、moving、faulted。
-- `gate_command` 状态：pending、approved、rejected、executing、completed、aborted。
+- `gate` 状态：idle、reserved、moving、faulted；另带封锁标记 `lockdown_id`（不改变运行状态，仅表示该闸门处于区域封锁内）。
+- `gate_command` 状态：pending、approved、rejected、executing、completed、aborted、withdrawn。
+- `region_lockdown` 状态：active、released。
 - 只有 pending 命令可以复核。
 - 只有 approved 命令可以执行，且执行令牌必须匹配。
 - clear 复核与闸门占用必须同时成功；任一步失败时两者都不写入。
 - blocked 复核使命令 rejected，不会占用闸门。
 - 模拟故障会令命令 aborted、闸门 faulted，并保留最终开度。
 - 已完成或已中止的命令不能再次执行。
+- 只有 approved 未开始的命令可被封锁撤回；撤回与闸门占用释放在同一临界区内完成，终态与执行中历史不可改写。
+- 封锁建立、重叠判定、撤回和占用释放全部在同一把仓库互斥锁下提交；失败不留部分标记。
+- 解除封锁是单向转换；解除后按当时真实状态重新调度，可再次封锁。
 
 ## 模块边界
 
@@ -64,6 +78,9 @@
 - `GET /commands/{id}`
 - `POST /commands/{id}/interlock`
 - `POST /commands/{id}/execute`
+- `POST /lockdowns`
+- `GET /lockdowns/{id}`
+- `POST /lockdowns/{id}/release`
 
 错误响应统一为：
 

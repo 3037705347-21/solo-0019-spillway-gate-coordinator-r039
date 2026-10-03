@@ -20,6 +20,9 @@ POST /commands
 GET  /commands/{id}
 POST /commands/{id}/interlock
 POST /commands/{id}/execute
+POST /lockdowns
+GET  /lockdowns/{id}
+POST /lockdowns/{id}/release
 ```
 
 登记闸门示例：
@@ -64,6 +67,27 @@ POST /commands/{id}/execute
 }
 ```
 
+建立区域封锁示例（显式范围与业务依据；已批准未开始的命令会随闸门释放被撤回）：
+
+```json
+{
+  "reason": "上游区域警报，暂停指定范围闸门调整",
+  "authority": "duty-lead-wang",
+  "gate_ids": ["gate-east", "gate-north"]
+}
+```
+
+解除封锁示例：
+
+```json
+{
+  "released_by": "duty-lead-wang",
+  "note": "区域警报解除"
+}
+```
+
+封锁期间范围内新命令与 clear 复核返回 `409 gate_region_locked`；重复或重叠封锁返回 `409`，重复解除返回 `409 lockdown_not_active`。
+
 ## 目录
 
 - `cmd/server`：服务进程。
@@ -82,10 +106,16 @@ go run ./cmd/workflowcheck --workflow register-gate
 go run ./cmd/workflowcheck --workflow request-gate-command
 go run ./cmd/workflowcheck --workflow review-safety-interlock
 go run ./cmd/workflowcheck --workflow execute-gate-command
+go run ./cmd/workflowcheck --workflow establish-region-lockdown
+go run ./cmd/workflowcheck --workflow concurrent-region-lockdown
 ```
 
 这些检查会创建临时 HTTP 服务并调用真实路由。它们不调用外部网络，也不依赖数据库。
 
 ## 测试状态
 
-测试有意延后。当前交付仅包含初始化基线和生产级 smoke 检查；后续任务阶段会添加自动化测试与红绿验证，不应把当前没有测试文件视为项目未完成。
+领域状态机和内存仓库的封锁不变量由 `internal/domain`、`internal/storage` 下的单元测试覆盖（含 `-race` 并发场景）；端到端流程由 `cmd/workflowcheck` 的真实 HTTP 检查覆盖：
+
+```sh
+go test -race ./...
+```

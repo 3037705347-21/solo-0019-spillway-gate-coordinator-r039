@@ -7,17 +7,19 @@ import (
 )
 
 type Service struct {
-	repository storage.Repository
-	now        func() time.Time
-	newID      func(prefix string) (string, error)
-	newToken   func() (string, error)
+	repository    storage.Repository
+	now           func() time.Time
+	newID         func(prefix string) (string, error)
+	newLockdownID func() (string, error)
+	newToken      func() (string, error)
 }
 
 func NewService(repository storage.Repository) *Service {
 	return &Service{
-		repository: repository,
-		now:        time.Now,
-		newID:      randomIdentifier,
-		newToken:   randomToken,
+		repository:    repository,
+		now:           time.Now,
+		newID:         randomIdentifier,
+		newLockdownID: func() (string, error) { return randomHyphenIdentifier("lck") },
+		newToken:      randomToken,
 	}
 }

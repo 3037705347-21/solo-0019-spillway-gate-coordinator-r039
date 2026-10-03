@@ -32,6 +32,10 @@ func main() {
 		err = runReviewSafetyInterlock(client)
 	case "execute-gate-command":
 		err = runExecuteGateCommand(client)
+	case "establish-region-lockdown":
+		err = runEstablishRegionLockdown(client)
+	case "concurrent-region-lockdown":
+		err = runConcurrentRegionLockdown(client)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown workflow: %s\n", *workflow)
 		os.Exit(2)

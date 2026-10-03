@@ -40,6 +40,21 @@
         "blocked 结论不能占用闸门",
         "clear 结论必须与闸门占用一起成功"
       ]
+    },
+    {
+      "id": "region_lockdown",
+      "label": "区域封锁",
+      "relations": [
+        "region_lockdown covers gate",
+        "withdrawn gate_command references region_lockdown"
+      ],
+      "invariants": [
+        "封锁必须显式声明闸门范围和业务依据",
+        "范围不能为空、不能重复列出闸门",
+        "活动封锁范围内闸门不能再被另一活动封锁覆盖",
+        "建立封锁时 approved 未开始命令与闸门占用释放一起处理",
+        "解除是单向转换，重复解除必须冲突"
+      ]
     }
   ],
   "state_machines": [
@@ -60,7 +75,8 @@
       "invariants": [
         "reserved 和 moving 必须绑定活动命令",
         "faulted 不参与自动恢复",
-        "settle 后活动命令引用必须清空"
+        "settle 后活动命令引用必须清空",
+        "封锁标记独立于运行状态，标记或清除都不能改变 idle/reserved/moving/faulted"
       ]
     },
     {
@@ -71,18 +87,21 @@
         "rejected",
         "executing",
         "completed",
-        "aborted"
+        "aborted",
+        "withdrawn"
       ],
       "transitions": [
         "pending->approved",
         "pending->rejected",
         "approved->executing",
+        "approved->withdrawn",
         "executing->completed",
         "executing->aborted"
       ],
       "invariants": [
         "只有 pending 可以复核",
-        "只有 approved 可以执行",
+        "只有 approved 可以执行或被封锁撤回",
+        "撤回必须同时作废执行令牌并记录封锁引用",
         "终态不可回退",
         "版本号在每次转换后递增"
       ]
@@ -120,8 +139,10 @@
     },
     {
       "family": "恢复与回滚",
-      "occupied_by": [],
-      "available": true
+      "occupied_by": [
+        "region_lockdown_withdrawal_and_release"
+      ],
+      "available": false
     }
   ],
   "extension_seams": [
@@ -167,6 +188,16 @@
       "workflow_id": "execute-gate-command",
       "description": "执行必须同时校验活动命令、命令状态和一次性令牌；故障路径还要原子地中止命令并把闸门锁存为 faulted",
       "observable_failure": "错误或复用令牌仍改变状态，故障时只更新命令未更新闸门，或只更新闸门未清除活动引用"
+    },
+    {
+      "workflow_id": "establish-region-lockdown",
+      "description": "封锁必须与 approved 未开始命令的撤回、闸门占用释放原子提交；pending/executing/终态命令按各自真实条件处理，不能被改写；重叠封锁并发只能有一个赢家",
+      "observable_failure": "闸门已标记封锁但 approved 命令仍保留令牌，或命令被撤回却仍占用闸门，completed/aborted 历史被改动，两个并发封锁都成功"
+    },
+    {
+      "workflow_id": "release-region-lockdown",
+      "description": "解除只清除封锁标记，不能改变闸门运行状态；解除后必须按当时真实开度和状态重新可调度，重复解除必须得到稳定冲突",
+      "observable_failure": "解除把 faulted/moving 闸门重置为 idle，已 settle 的开度被回滚，或重复解除返回成功并重复清标记"
     }
   ]
 }

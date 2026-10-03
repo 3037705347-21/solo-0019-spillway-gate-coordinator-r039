@@ -25,3 +25,14 @@ type ExecuteCommandRequest struct {
 	Token         string `json:"token"`
 	SimulateFault bool   `json:"simulate_fault"`
 }
+
+type CreateLockdownRequest struct {
+	Reason    string   `json:"reason"`
+	Authority string   `json:"authority"`
+	GateIDs   []string `json:"gate_ids"`
+}
+
+type ReleaseLockdownRequest struct {
+	ReleasedBy string `json:"released_by"`
+	Note       string `json:"note"`
+}

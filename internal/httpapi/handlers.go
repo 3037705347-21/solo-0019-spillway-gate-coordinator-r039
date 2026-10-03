@@ -109,3 +109,53 @@ func (h *handler) executeCommand(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 }
+
+func (h *handler) createLockdown(w http.ResponseWriter, r *http.Request) {
+	var request contracts.CreateLockdownRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	lockdown, err := h.service.CreateLockdown(r.Context(), request)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, contracts.LockdownResponse{Lockdown: lockdownView(lockdown)})
+}
+
+func (h *handler) lockdown(w http.ResponseWriter, r *http.Request) {
+	lockdown, err := h.service.Lockdown(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, contracts.LockdownResponse{Lockdown: lockdownView(lockdown)})
+}
+
+func (h *handler) releaseLockdown(w http.ResponseWriter, r *http.Request) {
+	var request contracts.ReleaseLockdownRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	lockdown, gates, err := h.service.ReleaseLockdown(r.Context(), r.PathValue("id"), request)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	gateViews := make([]contracts.GateView, 0, len(gates))
+	for _, gate := range gates {
+		gateViews = append(gateViews, gateView(gate))
+	}
+	writeJSON(
+		w,
+		http.StatusOK,
+		contracts.ReleaseLockdownResponse{
+			Lockdown: lockdownView(lockdown),
+			Gates:    gateViews,
+		},
+	)
+}

@@ -27,4 +27,13 @@ type Repository interface {
 		simulateFault bool,
 		now time.Time,
 	) (domain.GateCommand, domain.Gate, error)
+	CreateLockdown(ctx context.Context, lockdown domain.RegionLockdown, now time.Time) (domain.RegionLockdown, error)
+	Lockdown(ctx context.Context, id string) (domain.RegionLockdown, error)
+	ReleaseLockdown(
+		ctx context.Context,
+		lockdownID string,
+		releasedBy string,
+		note string,
+		now time.Time,
+	) (domain.RegionLockdown, []domain.Gate, error)
 }

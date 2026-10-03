@@ -124,6 +124,47 @@
         "storage",
         "contracts"
       ]
+    },
+    {
+      "id": "establish-region-lockdown",
+      "name": "Establish region lockdown",
+      "entry": "POST /lockdowns",
+      "steps": [
+        "validate explicit gate scope and business basis",
+        "mark every scoped gate under one repository critical section",
+        "withdraw approved-not-started commands and release their reservations together"
+      ],
+      "success": "returns an active lockdown with the withdrawn command ids; scoped gates show region_locked with unchanged operating status",
+      "failure": "returns stable conflict for duplicate or overlapping scope; terminal and in-flight history is never rewritten",
+      "verification": "workflowcheck locks five gates spanning pending/approved/completed/aborted generations and proves each rule plus re-scheduling after release",
+      "module_ids": [
+        "entrypoint",
+        "httpapi",
+        "coordination",
+        "domain",
+        "storage",
+        "contracts"
+      ]
+    },
+    {
+      "id": "release-region-lockdown",
+      "name": "Release region lockdown",
+      "entry": "POST /lockdowns/{id}/release",
+      "steps": [
+        "verify the lockdown is active",
+        "clear the lockdown marker on every scoped gate without changing operating status"
+      ],
+      "success": "returns the released lockdown and the restored gates; new commands, clear reviews and re-lockdown work again",
+      "failure": "returns stable conflict for a repeated release and not found for an unknown id",
+      "verification": "establish-region-lockdown workflow checks re-scheduling and re-lockdown after release; concurrent-region-lockdown checks single-winner overlap races",
+      "module_ids": [
+        "entrypoint",
+        "httpapi",
+        "coordination",
+        "domain",
+        "storage",
+        "contracts"
+      ]
     }
   ],
   "complexity": {
@@ -131,8 +172,9 @@
       "state_transition",
       "concurrency",
       "resource_lifetime",
-      "error_propagation"
+      "error_propagation",
+      "recovery_and_rollback"
     ],
-    "notes": "Gate reservation and command transitions are committed under one repository lock; execution tokens are single-command resources and become invalid after a terminal transition."
+    "notes": "Gate reservation and command transitions are committed under one repository lock; execution tokens are single-command resources and become invalid after a terminal transition. Region lockdown establishment (scope marking, approved-command withdrawal, reservation release) is one atomic critical section; overlapping lockdowns race to a single winner, and release restores scheduling from the real then-current gate state."
   }
 }

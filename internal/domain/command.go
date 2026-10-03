@@ -14,6 +14,7 @@ const (
 	CommandExecuting CommandStatus = "executing"
 	CommandCompleted CommandStatus = "completed"
 	CommandAborted   CommandStatus = "aborted"
+	CommandWithdrawn CommandStatus = "withdrawn"
 )
 
 type GateCommand struct {
@@ -28,6 +29,7 @@ type GateCommand struct {
 	ExecutionToken   string
 	ExecutedBy       string
 	TerminalReason   string
+	LockdownID       string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	Version          int64
@@ -154,6 +156,32 @@ func (c *GateCommand) Abort(reason string, now time.Time) error {
 	c.ExecutionToken = ""
 	c.TerminalReason = reason
 	c.Status = CommandAborted
+	c.UpdatedAt = now.UTC()
+	c.Version++
+	return nil
+}
+
+// Withdraw terminates an approved command that has not started executing when
+// its gate is covered by a region lockdown. The execution token is invalidated
+// together with the gate reservation. Terminal or in-flight commands cannot be
+// withdrawn: their history must remain intact.
+func (c *GateCommand) Withdraw(reason, lockdownID string, now time.Time) error {
+	if c.Status != CommandApproved {
+		return Conflict("command_not_withdrawable", "only approved commands that have not started can be withdrawn")
+	}
+	lockdownID = strings.TrimSpace(lockdownID)
+	if lockdownID == "" {
+		return Invalid("invalid_lockdown_reference", "lockdown id is required")
+	}
+
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "region_lockdown"
+	}
+	c.ExecutionToken = ""
+	c.TerminalReason = reason
+	c.LockdownID = lockdownID
+	c.Status = CommandWithdrawn
 	c.UpdatedAt = now.UTC()
 	c.Version++
 	return nil

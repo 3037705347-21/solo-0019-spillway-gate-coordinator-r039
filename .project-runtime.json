@@ -5,7 +5,9 @@
     ".go"
   ],
   "build_command": "go build ./...",
-  "testing": "deferred",
+  "testing": {
+    "test_command": "go test ./..."
+  },
   "service": {
     "run_command": "go run ./cmd/server --addr 127.0.0.1:18119",
     "health_url": "http://127.0.0.1:18119/health"
@@ -26,6 +28,14 @@
     {
       "workflow_id": "execute-gate-command",
       "command": "go run ./cmd/workflowcheck --workflow execute-gate-command"
+    },
+    {
+      "workflow_id": "establish-region-lockdown",
+      "command": "go run ./cmd/workflowcheck --workflow establish-region-lockdown"
+    },
+    {
+      "workflow_id": "concurrent-region-lockdown",
+      "command": "go run ./cmd/workflowcheck --workflow concurrent-region-lockdown"
     }
   ]
 }

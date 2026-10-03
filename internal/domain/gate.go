@@ -24,8 +24,13 @@ type Gate struct {
 	Aperture        float64
 	MaxAperture     float64
 	ActiveCommandID string
+	LockdownID      string
 	UpdatedAt       time.Time
 	Version         int64
+}
+
+func (g Gate) IsRegionLocked() bool {
+	return g.LockdownID != ""
 }
 
 func NewGate(id, name string, maxAperture, initialAperture float64, now time.Time) (Gate, error) {
@@ -103,6 +108,52 @@ func (g *Gate) Settle(finalAperture float64, faulted bool, now time.Time) error 
 	} else {
 		g.Status = GateIdle
 	}
+	g.UpdatedAt = now.UTC()
+	g.Version++
+	return nil
+}
+
+// MarkRegionLocked adds an active lockdown marker to a gate. Gate operating
+// status (idle/reserved/moving/faulted) is preserved so the field view can show
+// both the physical gate state and the region lockdown that covers it.
+func (g *Gate) MarkRegionLocked(lockdownID string, now time.Time) error {
+	if strings.TrimSpace(lockdownID) == "" {
+		return Invalid("invalid_lockdown_reference", "lockdown id is required")
+	}
+	if g.LockdownID != "" {
+		return Conflict("gate_already_locked", "gate is already covered by an active region lockdown")
+	}
+	g.LockdownID = lockdownID
+	g.UpdatedAt = now.UTC()
+	g.Version++
+	return nil
+}
+
+// ReleaseReservation clears an approved-but-not-started command's reservation
+// without settling the aperture: no gate movement has happened, so the current
+// aperture and the operating status return to idle together. It can only be
+// applied to a gate reserved by the named command.
+func (g *Gate) ReleaseReservation(commandID string, now time.Time) error {
+	if g.Status != GateReserved {
+		return Conflict("gate_not_reserved", "gate must be reserved before its reservation can be released")
+	}
+	if g.ActiveCommandID != commandID {
+		return Conflict("gate_command_mismatch", "gate is reserved by a different command")
+	}
+	g.Status = GateIdle
+	g.ActiveCommandID = ""
+	g.UpdatedAt = now.UTC()
+	g.Version++
+	return nil
+}
+
+// ClearRegionLockdown removes a lockdown marker. The operating status itself
+// is never changed: a moving gate keeps moving, a faulted gate stays faulted.
+func (g *Gate) ClearRegionLockdown(now time.Time) error {
+	if g.LockdownID == "" {
+		return Conflict("gate_not_locked", "gate is not covered by an active region lockdown")
+	}
+	g.LockdownID = ""
 	g.UpdatedAt = now.UTC()
 	g.Version++
 	return nil
