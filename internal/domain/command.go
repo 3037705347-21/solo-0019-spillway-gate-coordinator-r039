@@ -14,6 +14,7 @@ const (
 	CommandExecuting CommandStatus = "executing"
 	CommandCompleted CommandStatus = "completed"
 	CommandAborted   CommandStatus = "aborted"
+	CommandRevoked   CommandStatus = "revoked"
 )
 
 type GateCommand struct {
@@ -154,6 +155,23 @@ func (c *GateCommand) Abort(reason string, now time.Time) error {
 	c.ExecutionToken = ""
 	c.TerminalReason = reason
 	c.Status = CommandAborted
+	c.UpdatedAt = now.UTC()
+	c.Version++
+	return nil
+}
+
+func (c *GateCommand) Revoke(reason string, now time.Time) error {
+	if c.Status != CommandApproved {
+		return Conflict("command_not_revocable", "only approved commands can be revoked")
+	}
+
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "regional_lockdown"
+	}
+	c.ExecutionToken = ""
+	c.TerminalReason = reason
+	c.Status = CommandRevoked
 	c.UpdatedAt = now.UTC()
 	c.Version++
 	return nil

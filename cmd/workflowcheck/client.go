@@ -91,6 +91,23 @@ func requireStatus(result apiResult, expected int, operation string) error {
 	)
 }
 
+func requireErrorCode(result apiResult, expected string, operation string) error {
+	code, err := stringField(result.Body, "code")
+	if err != nil {
+		return fmt.Errorf("%s: %w", operation, err)
+	}
+	if code != expected {
+		return fmt.Errorf(
+			"%s: expected error code %q, got %q with body %s",
+			operation,
+			expected,
+			code,
+			prettyBody(result.Body),
+		)
+	}
+	return nil
+}
+
 func objectField(body map[string]any, name string) (map[string]any, error) {
 	value, exists := body[name]
 	if !exists {
@@ -101,6 +118,18 @@ func objectField(body map[string]any, name string) (map[string]any, error) {
 		return nil, fmt.Errorf("response field %q is not an object", name)
 	}
 	return object, nil
+}
+
+func arrayField(body map[string]any, name string) ([]any, error) {
+	value, exists := body[name]
+	if !exists {
+		return nil, fmt.Errorf("response is missing array field %q", name)
+	}
+	array, ok := value.([]any)
+	if !ok {
+		return nil, fmt.Errorf("response field %q is not an array", name)
+	}
+	return array, nil
 }
 
 func stringField(object map[string]any, name string) (string, error) {

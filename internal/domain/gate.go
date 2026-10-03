@@ -24,6 +24,7 @@ type Gate struct {
 	Aperture        float64
 	MaxAperture     float64
 	ActiveCommandID string
+	LockdownID      string
 	UpdatedAt       time.Time
 	Version         int64
 }
@@ -103,6 +104,49 @@ func (g *Gate) Settle(finalAperture float64, faulted bool, now time.Time) error 
 	} else {
 		g.Status = GateIdle
 	}
+	g.UpdatedAt = now.UTC()
+	g.Version++
+	return nil
+}
+
+func (g *Gate) Release(commandID string, now time.Time) error {
+	if g.Status != GateReserved {
+		return Conflict("gate_not_reserved", "gate must be reserved before it can be released")
+	}
+	if g.ActiveCommandID != commandID {
+		return Conflict("gate_command_mismatch", "gate is reserved by a different command")
+	}
+
+	g.Status = GateIdle
+	g.ActiveCommandID = ""
+	g.UpdatedAt = now.UTC()
+	g.Version++
+	return nil
+}
+
+func (g *Gate) Lock(lockdownID string, now time.Time) error {
+	if g.LockdownID != "" {
+		return Conflict("gate_already_locked", "gate is already covered by an active lockdown")
+	}
+	if strings.TrimSpace(lockdownID) == "" {
+		return Invalid("invalid_lockdown_id", "lockdown id is required")
+	}
+
+	g.LockdownID = lockdownID
+	g.UpdatedAt = now.UTC()
+	g.Version++
+	return nil
+}
+
+func (g *Gate) Unlock(lockdownID string, now time.Time) error {
+	if g.LockdownID == "" {
+		return Conflict("gate_not_locked", "gate is not covered by an active lockdown")
+	}
+	if g.LockdownID != lockdownID {
+		return Conflict("gate_lockdown_mismatch", "gate is covered by a different lockdown")
+	}
+
+	g.LockdownID = ""
 	g.UpdatedAt = now.UTC()
 	g.Version++
 	return nil

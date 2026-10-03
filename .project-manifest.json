@@ -124,6 +124,29 @@
         "storage",
         "contracts"
       ]
+    },
+    {
+      "id": "regional-lockdown",
+      "name": "Regional lockdown",
+      "entry": "POST /lockdowns",
+      "steps": [
+        "validate the explicit gate scope, business reason, and supervisor identity",
+        "revoke approved commands that have not started and release their gates in the same critical section",
+        "mark every gate in scope with the active lockdown so field-visible state matches the scope",
+        "reject new commands and new reservations in scope while the lockdown is active",
+        "lift the lockdown with a recorded operator and clear gate marks so scheduling resumes on current conditions"
+      ],
+      "success": "returns the active lockdown with the revoked commands and released gates; lifting returns the lifted lockdown",
+      "failure": "returns conflict for overlapping lockdowns, repeated lifts, and commands or reservations attempted during the lockdown",
+      "verification": "workflowcheck establishes a lockdown over two gates, proves atomic revocation and blocking, lifts it, and reschedules on current conditions",
+      "module_ids": [
+        "entrypoint",
+        "httpapi",
+        "coordination",
+        "domain",
+        "storage",
+        "contracts"
+      ]
     }
   ],
   "complexity": {

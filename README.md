@@ -1,6 +1,6 @@
 # 泄洪闸门操作协调服务
 
-这是一个无外部依赖的 Go 后端，用本地内存仓库协调闸门登记、开度调整命令、安全联锁复核和执行结果。服务强调单闸门活动命令互斥、原子状态转换、执行令牌生命周期和稳定错误传播。
+这是一个无外部依赖的 Go 后端，用本地内存仓库协调闸门登记、开度调整命令、安全联锁复核和执行结果。服务强调单闸门活动命令互斥、原子状态转换、执行令牌生命周期和稳定错误传播。上游区域警报时，值班负责人可以建立有明确范围和业务依据的区域封锁：封锁在同一临界区内撤回未开始执行的授权并释放闸门，封锁期间阻止范围内的新命令和新占用，解除后按当时真实条件恢复调度。
 
 ## 运行
 
@@ -20,6 +20,9 @@ POST /commands
 GET  /commands/{id}
 POST /commands/{id}/interlock
 POST /commands/{id}/execute
+POST /lockdowns
+GET  /lockdowns/{id}
+POST /lockdowns/{id}/lift
 ```
 
 登记闸门示例：
@@ -64,6 +67,24 @@ POST /commands/{id}/execute
 }
 ```
 
+建立区域封锁示例：
+
+```json
+{
+  "gate_ids": ["gate-east", "gate-west"],
+  "reason": "上游区域警报",
+  "established_by": "duty-chief-zhao"
+}
+```
+
+解除区域封锁示例：
+
+```json
+{
+  "lifted_by": "duty-chief-qian"
+}
+```
+
 ## 目录
 
 - `cmd/server`：服务进程。
@@ -82,6 +103,7 @@ go run ./cmd/workflowcheck --workflow register-gate
 go run ./cmd/workflowcheck --workflow request-gate-command
 go run ./cmd/workflowcheck --workflow review-safety-interlock
 go run ./cmd/workflowcheck --workflow execute-gate-command
+go run ./cmd/workflowcheck --workflow regional-lockdown
 ```
 
 这些检查会创建临时 HTTP 服务并调用真实路由。它们不调用外部网络，也不依赖数据库。

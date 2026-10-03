@@ -109,3 +109,57 @@ func (h *handler) executeCommand(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 }
+
+func (h *handler) establishLockdown(w http.ResponseWriter, r *http.Request) {
+	var request contracts.EstablishLockdownRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	lockdown, revoked, gates, err := h.service.EstablishLockdown(r.Context(), request)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(
+		w,
+		http.StatusCreated,
+		contracts.EstablishLockdownResponse{
+			Lockdown:        lockdownView(lockdown),
+			RevokedCommands: commandViews(revoked),
+			Gates:           gateViews(gates),
+		},
+	)
+}
+
+func (h *handler) lockdown(w http.ResponseWriter, r *http.Request) {
+	lockdown, err := h.service.Lockdown(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, contracts.LockdownResponse{Lockdown: lockdownView(lockdown)})
+}
+
+func (h *handler) liftLockdown(w http.ResponseWriter, r *http.Request) {
+	var request contracts.LiftLockdownRequest
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	lockdown, gates, err := h.service.LiftLockdown(r.Context(), r.PathValue("id"), request)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(
+		w,
+		http.StatusOK,
+		contracts.LiftLockdownResponse{
+			Lockdown: lockdownView(lockdown),
+			Gates:    gateViews(gates),
+		},
+	)
+}
